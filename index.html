@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Farm Management System</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: url('https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1600&q=80') no-repeat center center/cover;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .overlay {
+      background: rgba(0,0,0,0.6);
+      padding: 40px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0px 4px 15px rgba(0,0,0,0.4);
+    }
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 15px;
+    }
+    input {
+      width: 80%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px 25px;
+      border: none;
+      border-radius: 8px;
+      background: #4CAF50;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #388e3c;
+    }
+    #google_translate_element {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <h1>🌾 Farm Management System</h1>
+    <p>Enter your farm name (optional):</p>
+    <input type="text" id="farmName" placeholder="Farm Name">
+    <br>
+    <button onclick="login()">Login</button>
+      </div>
+
+  <script>
+    function login() {
+      const farmName = document.getElementById("farmName").value;
+      if (farmName) {
+        localStorage.setItem("farmName", farmName);
+      }
+      window.location.href = "pro7.html";
+    }
+
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
+    }
+  </script>
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

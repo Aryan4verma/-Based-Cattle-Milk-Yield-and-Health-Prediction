@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cow Health — Livestock Management Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- jsPDF + autoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <!-- Font Awesome icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --accent:#1e8f51;        /* agricultural green */
+      --accent-2:#2f7fb3;      /* cool blue */
+      --bg:#f6f9f6;            /* subtle light */
+      --card:#ffffff;
+      --muted:#6b7280;
+      --danger:#c62828;
+      --success:#2e7d32;
+      --glass: rgba(255,255,255,0.82);
+      --radius:14px;
+      --shadow: 0 8px 30px rgba(18,38,63,0.08);
+    }
+
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+    body{
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.72), rgba(250,250,250,0.92)),
+        url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') center/cover fixed;
+      -webkit-font-smoothing:antialiased;
+      padding:28px;
+      color:#0f1724;
+    }
+
+    .app {
+      max-width:1200px;
+      margin:0 auto;
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.88));
+      border-radius:18px;
+      padding:20px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(6px) saturate(120%);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+
+    header.app-header{
+      display:flex;
+      gap:16px;
+      align-items:center;
+      margin-bottom:18px;
+    }
+    header .logo{
+      width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      display:flex;align-items:center;justify-content:center;color:white;font-size:22px;box-shadow:0 6px 18px rgba(0,0,0,0.12);
+    }
+    header h1{font-size:1.4rem;margin:0}
+    header p {margin:0;color:var(--muted);font-size:0.95rem}
+
+    /* layout */
+    .grid {
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:18px;
+    }
+
+    /* left card (input) */
+    .card {
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:16px;
+      box-shadow: 0 6px 18px rgba(12,22,29,0.05);
+    }
+
+    .form-group{margin-bottom:10px}
+    .form-row{display:flex;gap:8px}
+    label{display:block;font-weight:600;font-size:0.92rem;margin-bottom:6px;color:#0b1820}
+    input[type="text"], input[type="number"], select, textarea {
+      width:100%;
+      padding:10px 12px;border-radius:10px;border:1px solid #e6eef0;font-size:0.95rem;background:#fbfeff;
+      outline: none;
+    }
+    textarea{min-height:72px;resize:vertical}
+
+    .field-with-icon{display:flex;align-items:center;gap:8px}
+    .field-with-icon i{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#f0f7f3,#e9f5ee);display:flex;align-items:center;justify-content:center;color:var(--accent-2);}
+
+    .action-row{display:flex;gap:8px;align-items:center;margin-top:12px}
+    .btn{
+      padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(30,143,81,0.12)
+    }
+    .btn-secondary{background:transparent;border:1px solid #d4e9df;color:#0b2f1a;font-weight:700}
+    .small{font-size:0.9rem;padding:8px 10px;border-radius:10px}
+
+    /* right area — results + charts */
+    .right {
+      display:flex;flex-direction:column;gap:12px;
+    }
+
+    .summary {
+      display:flex;gap:12px;align-items:center;
+      background: linear-gradient(90deg,#fff,#fbfffb);
+      border-radius:12px;padding:14px;border:1px solid rgba(16,24,32,0.04)
+    }
+    .summary .metric{flex:1;padding:8px;border-radius:10px;text-align:center;background:transparent}
+    .metric .val{font-weight:800;font-size:1.3rem}
+    .metric small{display:block;color:var(--muted);margin-top:6px}
+
+    /* dynamic result card */
+    .result-card{
+      display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;
+      color:white;font-weight:700;
+    }
+    .result-good{background:linear-gradient(90deg,#2e7d32,#60b96a)}
+    .result-bad{background:linear-gradient(90deg,#c62828,#ff7b7b)}
+
+    .suggestions {margin-top:6px;background:#ffffff;padding:12px;border-radius:10px;border:1px solid rgba(12,24,36,0.03)}
+    .suggestions h3{margin:0 0 8px 0;font-size:1rem}
+    .suggestions ul{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+    .suggestions li{display:flex;gap:12px;align-items:flex-start;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fbfbfb,#fff);border:1px solid rgba(10,20,30,0.03)}
+    .suggestions .bullet{width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800}
+    .impact{font-weight:700}
+    .conf{font-weight:700;color:var(--muted);font-size:0.92rem}
+
+    /* charts area */
+    .charts {
+      display:grid;grid-template-columns:1fr 1fr;gap:12px;
+    }
+    .chart-card{background:white;padding:10px;border-radius:10px;border:1px solid rgba(12,24,36,0.03)}
+
+    /* responsive */
+    @media (max-width:980px){
+      .grid{grid-template-columns:1fr; }
+      .charts{grid-template-columns:1fr}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Cow Health Monitoring Dashboard">
+    <header class="app-header">
+      <div class="logo"><i class="fa-solid fa-cow"></i></div>
+      <div>
+        <h1>Livestock Health — Cow Assessment</h1>
+        <p>Interactive dashboard to analyze cow milk yield & health and generate actionable vet-backed recommendations.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Inputs -->
+      <div class="card" aria-labelledby="input-title">
+        <h2 id="input-title">Cow Data — Input</h2>
+
+        <div class="form-group">
+          <label>Tag / ID</label>
+          <div class="field-with-icon">
+            <i class="fa-solid fa-id-badge"></i>
+            <input id="tag" type="text" placeholder="e.g., Cow-023"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Breed</label>
+            <input id="breed" type="text" placeholder="e.g., Holstein"/>
+          </div>
+          <div style="width:120px" class="form-group">
+            <label>Parity</label>
+            <input id="parity" type="number" min="0" step="1" value="1"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Age (years)</label>
+            <input id="age" type="number" min="0" step="0.1" value="5"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Weight (kg)</label>
+            <input id="weight" type="number" min="0" step="0.1" value="550"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Lactation Stage</label>
+            <select id="lactation">
+              <option>Early</option>
+              <option selected>Mid</option>
+              <option>Late</option>
+            </select>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Historical Avg Milk (L/day)</label>
+            <input id="historicalMilk" type="number" min="0" step="0.1" value="12"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Feed Quality (1-10)</label>
+            <input id="feedQuality" type="number" min="1" max="10" value="7"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Daily Activity (hrs)</label>
+            <input id="activity" type="number" min="0" step="0.1" value="3"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Grazing Duration (hrs)</label>
+            <input id="grazing" type="number" min="0" step="0.1" value="4"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Sleeping Hours</label>
+            <input id="sleeping" type="number" min="0" step="0.1" value="8"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Vaccination up to date?</label>
+            <select id="vaccination">
+              <option selected>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Housing</label>
+            <select id="housing">
+              <option>Good (Ventilated & Clean)</option>
+              <option>Moderate</option>
+              <option>Poor</option>
+            </select>
+          </div>
+        </div>
+
+        <hr style="border:none;height:1px;background:#eef3ee;margin:12px 0"/>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Health Score (1-10)</label>
+            <input id="healthScore" type="number" min="1" max="10" value="8"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Body Temp (°C)</label>
+            <input id="bodyTemp" type="number" step="0.1" value="38.6"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Heart Rate (bpm)</label>
+            <input id="heartRate" type="number" min="20" max="200" value="72"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Ambient Temp (°C)</label>
+            <input id="ambientTemp" type="number" step="0.1" value="25"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div style="flex:1" class="form-group">
+            <label>Humidity (%)</label>
+            <input id="humidity" type="number" min="0" max="100" value="60"/>
+          </div>
+          <div style="flex:1" class="form-group">
+            <label>Season</label>
+            <select id="season">
+              <option>Summer</option>
+              <option selected>Monsoon</option>
+              <option>Winter</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button id="btnPredict" class="btn" type="button"><i class="fa-solid fa-microscope"></i> Analyze & Recommend</button>
+          <button id="btnExport" class="btn-secondary small" type="button"><i class="fa-solid fa-file-arrow-down"></i> Export PDF</button>
+          <div style="flex:1;text-align:right;color:var(--muted);font-size:0.9rem">Last update: <span id="lastUpdate">—</span></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Results + charts -->
+      <div class="right">
+        <div class="card">
+          <div class="summary" role="status" aria-live="polite">
+            <div class="metric">
+              <div style="font-size:0.85rem;color:var(--muted)">Predicted Milk</div>
+              <div class="val" id="predMilk">— L/day</div>
+              <small id="predDelta">vs historical —</small>
+            </div>
+            <div class="metric">
+              <div style="font-size:0.85rem;color:var(--muted)">Disease Risk</div>
+              <div class="val" id="riskLabel">—</div>
+              <small id="riskDesc">—</small>
+            </div>
+            <div class="metric">
+              <div style="font-size:0.85rem;color:var(--muted)">Confidence</div>
+              <div class="val" id="confidence">—%</div>
+              <small>Auto-estimated</small>
+            </div>
+          </div>
+
+          <div id="dynamicResult" style="margin-top:12px"></div>
+
+          <div class="suggestions" id="suggestionsBox" aria-live="polite">
+            <h3>Improvement Recommendations</h3>
+            <p style="margin:0 0 8px 0;color:var(--muted)">Ranked, specific, and actionable suggestions based on input data. Each suggestion includes a short rationale and confidence score.</p>
+            <ul id="suggestionList"></ul>
+          </div>
+        </div>
+
+        <div class="charts">
+          <div class="chart-card card">
+            <h3 style="margin:6px 0 12px 0">Milk Yield — Predicted vs Historical</h3>
+            <canvas id="yieldChart" height="160"></canvas>
+          </div>
+
+          <div class="chart-card card">
+            <h3 style="margin:6px 0 12px 0">Vital Trend / Risk Indicator</h3>
+            <canvas id="vitalsChart" height="160"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  Intelligent suggestion engine + charting + PDF export
+  - All logic runs client-side.
+  - Suggestions are heuristically scored (impact & confidence) based on input metrics.
+  - Confidence scores are estimates; treat as guidance — consult a veterinarian for diagnostics.
+*/
+
+/* ---------- Utilities ---------- */
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function pct(v) { return Math.round(v*100); }
+function nowLabel(){ return new Date().toLocaleString(); }
+
+/* ---------- Prediction model (heuristic placeholder) ---------- */
+function predictMilkYield(inputs){
+  // Weighted heuristic: feedQuality, historical, health, activity, parity, weight
+  let base = inputs.historicalMilk * 0.5
+            + inputs.feedQuality * 0.9
+            + inputs.healthScore * 0.6
+            + inputs.activity * 0.4
+            + inputs.parity * 0.2
+            + (inputs.weight/100) * 0.5;
+
+  // lactation stage modifier
+  if(inputs.lactation === 'Early') base *= 1.12;
+  if(inputs.lactation === 'Late') base *= 0.92;
+
+  // environmental stress reduces yield
+  if(inputs.ambientTemp > 28 && inputs.humidity > 60) base *= 0.9;
+
+  return clamp(Math.round(base*10)/10, 0, 100);
+}
+
+/* ---------- Risk detection rules (scientifically-informed heuristics) ----------
+   These rules are general veterinary guidelines (fever threshold, tachycardia, low health score),
+   used to generate practical suggestions. Always validate with a licensed veterinarian.
+*/
+function evaluateRisk(inputs){
+  let reasons = [];
+  let score = 0; // higher = higher risk
+
+  // health score contributes strongly (1-10 => 0..1)
+  score += (10 - inputs.healthScore) * 8;
+
+  // body temp: normal ~ 38.0 - 39.3 C for adult cows
+  if(inputs.bodyTemp >= 39.3){
+    score += (inputs.bodyTemp - 39.3) * 20;
+    reasons.push({k:'fever', text:`Elevated body temperature (${inputs.bodyTemp}°C).`});
+  }
+
+  // heart rate: normal (40-80 bpm), >100 indicates stress/pain
+  if(inputs.heartRate > 90){
+    score += (inputs.heartRate - 90) * 0.8;
+    reasons.push({k:'tachy', text:`High heart rate (${inputs.heartRate} bpm).`});
+  }
+
+  // vaccination lapse increases risk
+  if(inputs.vaccination === 'No') {
+    score += 12;
+    reasons.push({k:'vax', text:'Vaccination not up to date.'});
+  }
+
+  // poor housing
+  if(inputs.housing === 'Poor') {
+    score += 8;
+    reasons.push({k:'housing', text:'Housing conditions poor (ventilation/cleanliness).'});
+  }
+
+  // environmental heat stress
+  if(inputs.ambientTemp > 30 && inputs.humidity > 65){
+    score += 10;
+    reasons.push({k:'heat', text:'Heat stress risk (high ambient temp & humidity).'});
+  }
+
+  // low feed quality
+  if(inputs.feedQuality < 5){
+    score += (5 - inputs.feedQuality) * 3;
+    reasons.push({k:'feed', text:`Low feed quality (${inputs.feedQuality}/10).`});
+  }
+
+  // low historical milk + sudden drop indicator (we don't have time series, so compare predicted)
+  let predicted = predictMilkYield(inputs);
+  if(predicted < inputs.historicalMilk * 0.85){
+    score += 10;
+    reasons.push({k:'drop', text:'Predicted yield indicates a significant drop from historical average.'});
+  }
+
+  // Normalize risk to 0..100
+  let normalized = clamp(Math.round(score), 0, 100);
+  let label = normalized >= 35 ? 'High Risk' : 'Low Risk';
+  return {score: normalized, label, reasons, predicted};
+}
+
+/* ---------- Smart recommendation generator ----------
+  Requirements:
+   - Specific to input
+   - Scientifically validated (general vet guidance)
+   - Practical & implementable
+   - Ranked by potential impact
+  We'll produce a ranked list with (suggestion, rationale, estimated impact, confidence%)
+*/
+function generateRecommendations(inputs, evalResult){
+  let recs = [];
+  const predicted = evalResult.predicted;
+
+  // Helper to push suggestions with scoring
+  function push(id, title, rationale, impactScore, confidence) {
+    recs.push({id, title, rationale, impactScore, confidence});
+  }
+
+  // 1. If fever -> immediate vet check, fluids, antipyretics per vet
+  if(inputs.bodyTemp >= 39.3){
+    push('vet-check','Immediate veterinary examination',
+      `Body temperature ${inputs.bodyTemp}°C indicates fever. Immediate physical exam and diagnostics (blood tests, udder check) are recommended.`,
+      9, 0.95);
+  }
+
+  // 2. If heart rate high -> pain/heat/stress mitigation
+  if(inputs.heartRate > 90){
+    push('assess-stress','Assess pain/heat & reduce stressors',
+      `Heart rate ${inputs.heartRate} bpm suggests physiological stress — check for lameness, mastitis, or heat stress; provide shade, cool water and reduce handling.`,
+      8, 0.9);
+  }
+
+  // 3. If ambient heat/humidity -> cooling measures
+  if(inputs.ambientTemp > 28 && inputs.humidity > 60){
+    push('cooling','Implement cooling & ventilation',
+      `Heat and humidity can reduce feed intake and milk yield. Provide shade, fans, misting, and cool drinking water; adjust feeding times to cooler hours.`,
+      9, 0.9);
+  }
+
+  // 4. If vaccination missing -> vaccinate & biosecurity
+  if(inputs.vaccination === 'No'){
+    push('vaccinate','Update vaccination & review herd biosecurity',
+      `Up-to-date vaccination reduces infectious disease risk. Schedule vaccines as per local vet recommendations and reinforce biosecurity practices.`,
+      8, 0.92);
+  }
+
+  // 5. Improve feed quality if low or predicted < historical
+  if(inputs.feedQuality < 6 || predicted < inputs.historicalMilk){
+    push('nutrition','Improve nutrition & ration balance',
+      `Optimize energy/protein balance, include quality forages and concentrates as required; consider mineral/vitamin supplementation after feed analysis.`,
+      9, inputs.feedQuality < 6 ? 0.9 : 0.78);
+  }
+
+  // 6. Housing hygiene
+  if(inputs.housing === 'Poor' || inputs.housing === 'Moderate'){
+    push('housing','Improve housing ventilation & cleanliness',
+      `Ensure dry bedding, proper drainage, and regular cleaning to reduce mastitis and respiratory issues; consider periodic deep cleaning protocols.`,
+      7, 0.85);
+  }
+
+  // 7. Deworming & parasite control if low health or poor body condition (heuristic using weight vs breed expected — we do simple check by parity & weight)
+  if(inputs.healthScore <= 5 || inputs.weight < 350){
+    push('parasite','Assess parasites & deworm appropriately',
+      `Parasitism reduces productivity and welfare. Perform fecal egg counts and follow targeted deworming under veterinary guidance.`,
+      6, 0.8);
+  }
+
+  // 8. Monitor milk & establish alert thresholds (data practice)
+  push('monitoring','Establish continuous monitoring & alerts',
+    `Use daily milk yield logging and automated alerts for drops >15% from baseline; this enables early detection of mastitis, metabolic issues or nutrition problems.`,
+    8, 0.88);
+
+  // 9. Reproductive health checks when parity shows issues
+  if(inputs.parity >= 3 && inputs.age > 5){
+    push('repro','Evaluate reproductive & metabolic status',
+      `For older multiparous cows, check for reproductive efficiency and metabolic disorders (ketosis, fatty liver) which affect long-term productivity.`,
+      6, 0.75);
+  }
+
+  // 10. Optimize milking hygiene (always practical)
+  push('milking','Improve milking hygiene & udder care',
+    `Implement pre/post milking teat disinfection, proper milking routine, and periodic SCC checks to reduce mastitis and improve milk quality.`,
+    8, 0.9);
+
+  // Rank by impactScore desc, if tie by confidence
+  recs.sort((a,b) => (b.impactScore - a.impactScore) || (b.confidence - a.confidence));
+
+  // Convert to presentation-friendly structure
+  return recs.map((r, idx) => ({
+    rank: idx+1,
+    id: r.id,
+    title: r.title,
+    rationale: r.rationale,
+    impactRank: r.impactScore,
+    confidencePct: Math.round(r.confidence*100)
+  }));
+}
+
+/* ---------- Chart construction ---------- */
+let yieldChart = null, vitalsChart = null;
+
+function renderCharts(predicted, historical, inputs, riskScore){
+  // Predicted vs historical (line + area)
+  const ctx = document.getElementById('yieldChart').getContext('2d');
+  if(yieldChart) yieldChart.destroy();
+
+  // Create 7-day synthetic historical series centered on historical avg
+  let histSeries = Array.from({length:7}, (_,i) => {
+    // small variation +/- 8%
+    return Math.round((historical * (1 + (Math.sin(i+1)/20) + ((Math.random()-0.5)/10)))*10)/10;
+  });
+  let predSeries = Array.from({length:7}, (_,i) => {
+    return Math.round((predicted * (1 + ((Math.random()-0.5)/20)))*10)/10;
+  });
+
+  yieldChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [
+        {
+          label: 'Historical Avg (L/day)',
+          data: histSeries,
+          borderWidth:2,
+          borderColor: '#9aaec8',
+          backgroundColor: 'rgba(154,174,200,0.14)',
+          tension:0.35,
+          fill:true,
+          pointRadius:3
+        },
+        {
+          label: 'Predicted (L/day)',
+          data: predSeries,
+          borderWidth:3,
+          borderColor: riskScore >= 35 ? '#c62828' : '#2e7d32',
+          backgroundColor: riskScore >= 35 ? 'rgba(198,40,40,0.10)' : 'rgba(46,125,50,0.10)',
+          tension:0.35,
+          fill:true,
+          pointRadius:4
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top'}},
+      scales:{
+        y:{beginAtZero:false}
+      }
+    }
+  });
+
+  // Vitals chart: bar for heart rate & temp + risk gauge as donut
+  const ctx2 = document.getElementById('vitalsChart').getContext('2d');
+  if(vitalsChart) vitalsChart.destroy();
+
+  vitalsChart = new Chart(ctx2, {
+    type:'bar',
+    data:{
+      labels:['Body Temp (°C)','Heart Rate (bpm)','Ambient (°C)','Humidity (%)'],
+      datasets:[{
+        label:'Value',
+        data:[inputs.bodyTemp, inputs.heartRate, inputs.ambientTemp, inputs.humidity],
+        backgroundColor: ['#f97316','#ef4444','#60a5fa','#60a5fa'],
+        borderRadius:6
+      }]
+    },
+    options:{
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:true}
+      },
+      scales:{
+        y:{beginAtZero:true}
+      }
+    }
+  });
+}
+
+/* ---------- UI updates ---------- */
+function displayResults(evalResult, recs){
+  document.getElementById('predMilk').textContent = evalResult.predicted + ' L/day';
+  let deltaPercent = evalResult.predicted && window.inputs && inputs.historicalMilk ? Math.round((evalResult.predicted - inputs.historicalMilk)/inputs.historicalMilk*100) : 0;
+  document.getElementById('predDelta').textContent = (deltaPercent>=0?'+':'') + deltaPercent + '% vs historical';
+  document.getElementById('riskLabel').textContent = evalResult.label;
+  document.getElementById('riskDesc').textContent = evalResult.reasons.length ? evalResult.reasons.map(r=>r.text).slice(0,2).join(' • ') : 'No immediate concerns identified';
+  document.getElementById('confidence').textContent = Math.round((100 - evalResult.score)) + '%';
+
+  // dynamic result card
+  let dyn = document.getElementById('dynamicResult');
+  dyn.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'result-card ' + (evalResult.score >= 35 ? 'result-bad' : 'result-good');
+  card.innerHTML = `<div style="font-size:20px">${evalResult.score >= 35 ? '⚠️' : '✅'}</div>
+                    <div style="text-align:left">
+                      <div style="font-size:1.05rem;font-weight:800">${evalResult.label}</div>
+                      <div style="font-size:0.92rem;color:#07202b;margin-top:6px">${evalResult.score >= 35 ? 'Action recommended: follow ranked suggestions below.' : 'Cow appears stable; continue routine monitoring.'}</div>
+                    </div>`;
+  dyn.appendChild(card);
+
+  // Suggestions list
+  const list = document.getElementById('suggestionList'); list.innerHTML = '';
+  recs.forEach(s=>{
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div style="width:42px">
+        <div class="bullet" style="background:${s.rank===1?'#ffd166':'#e6f4ea'};color:${s.rank===1?'#5a3e00':'#234d22'}">${s.rank}</div>
+      </div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">${s.title}</div>
+          <div class="conf">${s.confidencePct}%</div>
+        </div>
+        <div style="margin-top:6px;color:var(--muted)">${s.rationale}</div>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+
+  // update last update
+  document.getElementById('lastUpdate').textContent = nowLabel();
+}
+
+/* ---------- PDF Export: structured table + charts + recommendations ---------- */
+async function exportPDF(inputs, evalResult, recs){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+  const left = 40, width = 520;
+  doc.setFontSize(16);
+  doc.text('Cow Health Report', left, 40);
+  doc.setFontSize(11);
+  doc.text(`Tag: ${inputs.tag || '—'}    Breed: ${inputs.breed || '—'}    Date: ${new Date().toLocaleString()}`, left, 60);
+
+  // Summary table using autoTable
+  const metrics = [
+    ['Predicted Milk (L/day)', evalResult.predicted],
+    ['Historical Milk (L/day)', inputs.historicalMilk],
+    ['Disease Risk', evalResult.label],
+    ['Risk Score (0-100)', evalResult.score],
+    ['Health Score (1-10)', inputs.healthScore],
+    ['Body Temp (°C)', inputs.bodyTemp],
+    ['Heart Rate (bpm)', inputs.heartRate],
+    ['Feed Quality (1-10)', inputs.feedQuality],
+    ['Vaccination', inputs.vaccination],
+    ['Housing', inputs.housing]
+  ];
+
+  doc.autoTable({
+    startY: 80,
+    theme: 'grid',
+    head: [['Metric','Value']],
+    body: metrics,
+    styles: { fontSize:10 }
+  });
+
+  // Add charts as images (render canvas -> dataURL)
+  // Yield chart
+  const yieldCanvas = document.getElementById('yieldChart');
+  const yieldImg = yieldCanvas.toDataURL('image/png',1.0);
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.text('Milk Yield Chart', left, 40);
+  doc.addImage(yieldImg, 'PNG', left, 56, 520, 220);
+
+  // Vitals chart
+  const vitalsCanvas = document.getElementById('vitalsChart');
+  const vitalsImg = vitalsCanvas.toDataURL('image/png',1.0);
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.text('Vitals Overview', left, 40);
+  doc.addImage(vitalsImg, 'PNG', left, 56, 520, 220);
+
+  // Recommendations (ranked)
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.text('Ranked Recommendations', left, 40);
+  doc.setFontSize(11);
+  let y = 64;
+  for(const r of recs){
+    doc.setFont(undefined,'bold');
+    doc.text(`${r.rank}. ${r.title}    [Confidence: ${r.confidencePct}%]`, left, y);
+    y += 14;
+    doc.setFont(undefined,'normal');
+    // wrap rationale text to width
+    const split = doc.splitTextToSize(r.rationale, 480);
+    doc.text(split, left, y);
+    y += split.length*12 + 12;
+    if(y > 720){ doc.addPage(); y = 40; }
+  }
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text('Note: Recommendations are heuristic and intended to assist decision-making. Consult a licensed veterinarian for diagnostic & treatment decisions.', left, 780);
+
+  doc.save(`cow_health_report_${(inputs.tag||'report')}.pdf`);
+}
+
+/* ---------- Main flow ---------- */
+let inputs = {};
+
+document.getElementById('btnPredict').addEventListener('click', ()=>{
+  // gather inputs
+  inputs = {
+    tag: document.getElementById('tag').value || null,
+    breed: document.getElementById('breed').value || null,
+    parity: Number(document.getElementById('parity').value) || 0,
+    age: Number(document.getElementById('age').value) || 0,
+    weight: Number(document.getElementById('weight').value) || 0,
+    lactation: document.getElementById('lactation').value,
+    historicalMilk: Number(document.getElementById('historicalMilk').value) || 0,
+    feedQuality: Number(document.getElementById('feedQuality').value) || 5,
+    activity: Number(document.getElementById('activity').value) || 0,
+    grazing: Number(document.getElementById('grazing').value) || 0,
+    sleeping: Number(document.getElementById('sleeping').value) || 0,
+    vaccination: document.getElementById('vaccination').value,
+    housing: document.getElementById('housing').value,
+    healthScore: Number(document.getElementById('healthScore').value) || 5,
+    bodyTemp: Number(document.getElementById('bodyTemp').value) || 38.5,
+    heartRate: Number(document.getElementById('heartRate').value) || 70,
+    ambientTemp: Number(document.getElementById('ambientTemp').value) || 25,
+    humidity: Number(document.getElementById('humidity').value) || 60,
+    season: document.getElementById('season').value
+  };
+
+  // compute predicted milk & risk
+  const predicted = predictMilkYield(inputs);
+  const evalResult = evaluateRisk(inputs);
+  evalResult.predicted = predicted;
+
+  const recs = generateRecommendations(inputs, evalResult);
+
+  // render charts & UI
+  renderCharts(predicted, inputs.historicalMilk, inputs, evalResult.score);
+  displayResults(evalResult, recs);
+
+  // store last computed objects for export
+  window.__lastInputs = inputs;
+  window.__lastEval = evalResult;
+  window.__lastRecs = recs;
+});
+
+document.getElementById('btnExport').addEventListener('click', async ()=>{
+  if(!window.__lastInputs){ alert('Run Analyze & Recommend first.'); return; }
+  await exportPDF(window.__lastInputs, window.__lastEval, window.__lastRecs);
+});
+
+/* Initialize with sample run */
+document.getElementById('btnPredict').click();
+
+</script>
+</body>
+</html>
